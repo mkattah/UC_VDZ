@@ -1,0 +1,235 @@
+---
+title: "convert_Robj_to_h5ad"
+output: html_notebook
+---
+# Chunk of code from Alejandro for converting Seurat object to Python
+
+
+# XAUT1/Blood
+```{r}
+# initialize the environment
+rm(list=ls())
+library(Seurat) 
+library(SeuratDisk) 
+
+# load the data
+load("~/Library/CloudStorage/Box-Box/XAUT1/RNA_Seq_data/merged_SCG11_14_Blood/blood_annotated.RData")
+
+# So, this method of using Convert function only works without "scale.data" field in the Seurat object. It's tricky to get rid of the scale.data field, thus we will copy into a new Seurat object without the scale.data field.
+FullSeurat = CreateSeuratObject(sobj@assays$RNA@counts, project = "CreateSeuratObject", assay = "RNA", names.field = 1, names.delim = "_", meta.data = sobj@meta.data)
+
+# replace the original Seurat object's "scale.data" field with double [0x0] using the FullSeurat
+sobj@assays$RNA@scale.data<-FullSeurat@assays$RNA@scale.data
+
+# make sure that we have the raw counts in the @x field
+sobj@assays$RNA@data@x <- sobj@assays$RNA@counts@x
+
+
+# save as seurat h5
+# RNA object
+SaveH5Seurat(sobj, filename = 'blood_annotated_allGenes.h5Seurat')
+
+#convert to h5ad, writes to disk
+Convert("blood_annotated_allGenes.h5Seurat", dest = "h5ad")
+```
+
+# XAUT1/Biopsies
+```{r}
+# initialize the environment
+rm(list=ls())
+
+library(Seurat) 
+library(SeuratDisk) 
+
+# load the data
+load("~/Library/CloudStorage/Box-Box/XAUT1/RNA_Seq_data/merged_SCG1_10_Biopsies/biopsies_annotated.RData")
+
+# So, this method of using Convert function only works without "scale.data" field in the Seurat object. It's tricky to get rid of the scale.data field, thus we will copy into a new Seurat object without the scale.data field.
+FullSeurat = CreateSeuratObject(sobj@assays$RNA@counts, project = "CreateSeuratObject", assay = "RNA", names.field = 1, names.delim = "_", meta.data = sobj@meta.data)
+
+ADTSeurat = CreateSeuratObject(sobj@assays$ADT@counts, project = "CreateSeuratObject", assay = "ADT", names.field = 1, names.delim = "_", meta.data = sobj@meta.data)
+
+# replace the original Seurat object's "scale.data" field with double [0x0] using the FullSeurat
+sobj@assays$RNA@scale.data<-FullSeurat@assays$RNA@scale.data
+
+# (RNA) make sure that we have the raw counts in the @x field
+sobj@assays$RNA@data@x <- sobj@assays$RNA@counts@x
+
+# (ADT) make sure that we have the raw counts in the @x field
+ADTSeurat@assays$ADT@data@x <- sobj@assays$ADT@counts@x
+
+# save as seurat h5
+# RNA
+SaveH5Seurat(sobj, filename = 'biopsies_annotated_RNA.h5Seurat')
+# ADT
+SaveH5Seurat(ADTSeurat, filename = 'biopsies_annotated_ADT.h5Seurat')
+#convert to h5ad, writes to disk
+# RNA
+Convert("biopsies_annotated_RNA.h5Seurat", dest = "h5ad")
+# ADT
+Convert("biopsies_annotated_ADT.h5Seurat", dest = "h5ad")
+
+```
+
+# XAUT2/Blood
+```{r}
+library(Seurat) 
+library(SeuratDisk) 
+
+# get rid of the previous objects
+rm(list=ls()) 
+
+# load the data
+load("~/Library/CloudStorage/Box-Box/XAUT2/RNA_Seq_data/merged_SCG9_12_Blood/blood_annotated.RData")
+
+sobj <- pbmc
+
+# So, this method of using Convert function only works without "scale.data" field in the Seurat object. It's tricky to get rid of the scale.data field, thus we will copy into a new Seurat object without the scale.data field.
+FullSeurat = CreateSeuratObject(sobj@assays$RNA@counts, project = "CreateSeuratObject", assay = "RNA", names.field = 1, names.delim = "_", meta.data = sobj@meta.data)
+
+ADTSeurat = CreateSeuratObject(sobj@assays$ADT@counts, project = "CreateSeuratObject", assay = "ADT", names.field = 1, names.delim = "_", meta.data = sobj@meta.data)
+
+# replace the original Seurat object's "scale.data" field with double [0x0] using the FullSeurat
+sobj@assays$RNA@scale.data<-FullSeurat@assays$RNA@scale.data
+
+# (RNA) make sure that we have the raw counts in the @x field
+sobj@assays$RNA@data@x <- sobj@assays$RNA@counts@x
+
+# (ADT) make sure that we have the raw counts in the @x field
+ADTSeurat@assays$ADT@data@x <- sobj@assays$ADT@counts@x
+
+# save as seurat h5
+# RNA
+SaveH5Seurat(sobj, filename = 'blood_annotated_RNA.h5Seurat')
+# ADT
+SaveH5Seurat(ADTSeurat, filename = 'blood_annotated_ADT.h5Seurat')
+#convert to h5ad, writes to disk
+# RNA
+Convert("blood_annotated_RNA.h5Seurat", dest = "h5ad")
+# ADT
+Convert("blood_annotated_ADT.h5Seurat", dest = "h5ad")
+```
+
+# XAUT2/Biopsies
+```{r}
+# get rid of the previous objects
+rm(list=ls()) 
+
+library(Seurat) 
+library(SeuratDisk) 
+
+# load the data
+load("~/Library/CloudStorage/Box-Box/XAUT2/RNA_Seq_data/merged_SCG1_8_Biopsies/biopsies_annotated.RData")
+
+sobj<-biop
+
+ # So, this method of using Convert function only works without "scale.data" field in the Seurat object. It's tricky to get rid of the scale.data field, thus we will copy into a new Seurat object without the scale.data field.
+FullSeurat = CreateSeuratObject(sobj@assays$RNA@counts, project = "CreateSeuratObject", assay = "RNA", names.field = 1, names.delim = "_", meta.data = sobj@meta.data)
+
+ADTSeurat = CreateSeuratObject(sobj@assays$ADT@counts, project = "CreateSeuratObject", assay = "ADT", names.field = 1, names.delim = "_", meta.data = sobj@meta.data)
+
+# replace the original Seurat object's "scale.data" field with double [0x0] using the FullSeurat
+sobj@assays$RNA@scale.data<-FullSeurat@assays$RNA@scale.data
+
+# (RNA) make sure that we have the raw counts in the @x field
+sobj@assays$RNA@data@x <- sobj@assays$RNA@counts@x
+
+# (ADT) make sure that we have the raw counts in the @x field
+ADTSeurat@assays$ADT@data@x <- sobj@assays$ADT@counts@x
+
+# save as seurat h5
+# RNA
+SaveH5Seurat(sobj, filename = 'biopsies_annotated_RNA.h5Seurat')
+# ADT
+SaveH5Seurat(ADTSeurat, filename = 'biopsies_annotated_ADT.h5Seurat')
+#convert to h5ad, writes to disk
+# RNA
+Convert("biopsies_annotated_RNA.h5Seurat", dest = "h5ad")
+# ADT
+Convert("biopsies_annotated_ADT.h5Seurat", dest = "h5ad")
+```
+
+# XAUT1/HTO-H
+```{r}
+library(Seurat) 
+library(SeuratDisk) 
+#library(SeuratData)
+
+# load the data
+load("~/Library/CloudStorage/Box-Box/XAUT1/HTO_vs_MultiSeq/H_10X_SO_DSO_scTransformed_processed.Robj")
+
+# So, this method of using Convert function only works without "scale.data" field in the Seurat object. It's tricky to get rid of the scale.data field, thus we will copy into a new Seurat object without the scale.data field.
+# Note. For this HTO datasets, there's "SCT" field, which is preferentially converted to over "RNA" or other assays. So, we will just copy the "RNA" assay among the full Seurat object.
+#RNASeurat = CreateSeuratObject(H_10X_SO_DSO@assays$RNA@counts, project = "CreateSeuratObject", assay = "RNA", names.field = 1, names.delim = "_", meta.data = H_10X_SO_DSO@meta.data)
+
+SCTSeurat = CreateSeuratObject(H_10X_SO_DSO@assays$SCT@counts, project = "CreateSeuratObject", assay = "SCT", names.field = 1, names.delim = "_", meta.data = H_10X_SO_DSO@meta.data)
+
+# copy the UMAP/PCA reductions from the main Seurat object
+SCTSeurat@reductions <- H_10X_SO_DSO@reductions
+
+# update the Seurat object
+SCTSeurat <- UpdateSeuratObject(SCTSeurat)
+
+# save as seurat h5
+# RNA object
+SaveH5Seurat(SCTSeurat, filename = 'H_10x_SO_DSO_allGenes.h5Seurat')
+
+#convert to h5ad, writes to disk
+Convert("H_10x_SO_DSO_allGenes.h5Seurat", dest = "h5ad")
+```
+
+# XAUT1/HTO-L
+```{r}
+library(Seurat) 
+library(SeuratDisk) 
+#library(SeuratData)
+
+# load the data
+load("~/Library/CloudStorage/Box-Box/XAUT1/HTO_vs_MultiSeq/L_10X_SO_DSO_scTransformed_processed.Robj")
+
+# So, this method of using Convert function only works without "scale.data" field in the Seurat object. It's tricky to get rid of the scale.data field, thus we will copy into a new Seurat object without the scale.data field.
+# Note. For this HTO datasets, there's "SCT" field, which is preferentially converted to over "RNA" or other assays. So, we will just copy the "RNA" assay among the full Seurat object.
+#RNASeurat = CreateSeuratObject(L_10X_SO_DSO@assays$RNA@counts, project = "CreateSeuratObject", assay = "RNA", names.field = 1, names.delim = "_", meta.data = L_10X_SO_DSO@meta.data)
+
+SCTSeurat = CreateSeuratObject(L_10X_SO_DSO@assays$SCT@counts, project = "CreateSeuratObject", assay = "SCT", names.field = 1, names.delim = "_", meta.data = L_10X_SO_DSO@meta.data)
+
+# copy the UMAP/PCA reductions from the main Seurat object
+SCTSeurat@reductions <- L_10X_SO_DSO@reductions
+
+# update the Seurat object
+SCTSeurat <- UpdateSeuratObject(SCTSeurat)
+
+
+
+
+
+# save as seurat h5
+# RNA object
+SaveH5Seurat(SCTSeurat, filename = 'L_10x_SO_DSO_allGenes.h5Seurat')
+
+#convert to h5ad, writes to disk
+Convert("L_10x_SO_DSO_allGenes.h5Seurat", dest = "h5ad")
+```
+# XAUT1/Blood
+```{r}
+library(Seurat) 
+library(SeuratDisk) 
+
+# load the data
+load("~/Library/CloudStorage/Box-Box/XAUT1/RNA_Seq_data/merged_SCG11_14_Blood/blood_annotated.RData")
+
+# So, this method of using Convert function only works without "scale.data" field in the Seurat object. It's tricky to get rid of the scale.data field, thus we will copy into a new Seurat object without the scale.data field.
+FullSeurat = CreateSeuratObject(sobj@assays$RNA@counts, project = "CreateSeuratObject", assay = "RNA", names.field = 1, names.delim = "_", meta.data = sobj@meta.data)
+
+# replace the original Seurat object's "scale.data" field with double [0x0] using the FullSeurat
+sobj@assays$RNA@scale.data<-FullSeurat@assays$RNA@scale.data
+sobj@assays$RNA@data@x <- sobj@assays$RNA@counts@x
+
+
+# save as seurat h5
+# RNA object
+SaveH5Seurat(sobj, filename = 'blood_annotated_allGenes.h5Seurat')
+
+#convert to h5ad, writes to disk
+Convert("blood_annotated_allGenes.h5Seurat", dest = "h5ad")
+```
