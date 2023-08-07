@@ -1,0 +1,606 @@
+---
+title: "23_8_6TileDB.Rmd"
+author: "Michael Kattah"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown, THIS GENERATES A SEURAT OBJECT FROM TILEDB FILES AND PERFORMS PSEUDOBULK ANALYSIS
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(ggpubr)
+library(ggrepel)
+library(gridExtra)
+library(matrixStats)
+library(patchwork)
+library(pheatmap)
+library(Seurat)
+library(RColorBrewer)
+library(reshape2)
+library(SeuratDisk)
+library(SeuratData)
+library(reticulate)
+library(scater)
+library(cowplot)
+library(sceasy)
+library(biomaRt)
+library(ggplot2)
+library(knitr)
+library(kableExtra)
+library(reshape2)
+library(fs)  # Load fs before tiledbsc
+library(tiledbsc)
+library(tiledb)
+library(SeuratObject)
+library(tidyverse)
+library(anndata)
+library(DESeq2)  # Added DESeq2
+```
+
+
+
+```{r}
+if (!require("tiledb", quietly = TRUE))
+  remotes::install_github("TileDB-Inc/TileDB-R", force = TRUE)
+
+if (!require("tiledbsc", quietly = TRUE))
+  remotes::install_github("tiledb-inc/tiledbsc", force = TRUE)
+
+library(tiledb)
+library(tiledbsc)
+```
+```{r}
+# File path to TileDB array on local machine
+tiledbURI <- "TileDB Export Only - 27JUN23/"
+```
+
+
+```{r}
+# read in SOMACollection
+tiledb_scdataset <- tiledbsc::SOMACollection$new(uri = tiledbURI, 
+                                                 verbose = FALSE)
+```
+
+
+
+```{r}
+names(tiledb_scdataset$somas)
+```
+```{r}
+names(tiledb_scdataset$somas$RNA$members)
+```
+
+```{r}
+# batch_mode parallelizes the readin, decreasing computation time
+counts <- tiledb_scdataset$somas$RNA$X$members$counts$to_matrix(batch_mode = TRUE) 
+dim(counts)
+```
+
+
+```{r}
+counts[1:4,1:4]
+```
+
+```{r}
+metadata <- tiledb_scdataset$somas$RNA$obs$to_dataframe()
+dim(metadata)
+```
+
+```{r}
+metadata[1:4,1:10]
+
+```
+
+```{r}
+cellCoords <- tiledb_scdataset$somas$RNA$obs$to_dataframe(
+  attrs = c("x_FOV_px", "y_FOV_px", "x_slide_mm", "y_slide_mm", 
+            "slide_ID_numeric", "Run_Tissue_name", "fov"))
+head(cellCoords)
+```
+
+```{r}
+ggplot(cellCoords, aes(x=x_slide_mm, y=y_slide_mm))+
+  geom_point(alpha = 0.05, size = 0.01)+
+  facet_wrap(~Run_Tissue_name)+
+  coord_equal()+
+  labs(title = "Cell coordinates in XY space")
+```
+
+```{r}
+transcriptCoords <- tiledb::tiledb_array(
+  tiledb_scdataset$somas$RNA$obsm$members$transcriptCoords$uri,
+  return_as="data.frame")[]
+head(transcriptCoords)
+```
+
+
+
+```{r}
+slide <- 1
+fov <- 15
+
+slideName <- unique(cellCoords$Run_Tissue_name[cellCoords$slide_ID_numeric == 
+                                                 slide])
+
+fovCoords <- cellCoords[cellCoords$slide_ID_numeric == slide & 
+                          cellCoords$fov == fov,]
+fovTranscriptCoords <- transcriptCoords[transcriptCoords$slideID == slide & 
+                                          transcriptCoords$fov == fov,]
+
+targetCounts <- table(fovTranscriptCoords$target)
+
+targets <- names(targetCounts[which(targetCounts >= 2500 & 
+                                      targetCounts <= 3000)])
+fovTranscriptCoords <- fovTranscriptCoords[fovTranscriptCoords$target %in% 
+                                             targets,]
+
+p<-ggplot(fovCoords, aes(x=x_FOV_px, y=y_FOV_px))+
+  geom_point(alpha = 0.6, size = 0.1, color = "black")+
+  geom_point(data = fovTranscriptCoords, 
+             mapping = aes(x=x_FOV_px, 
+                           y=y_FOV_px, 
+                           color = target), 
+             size = 0.3, alpha = 0.2)+
+  theme_bw()+
+  coord_equal()+
+  guides(colour = guide_legend(override.aes = list(size=1,
+                                                   alpha=1)))+
+  labs(color = "RNA Target", title = paste0("RNA Transcripts in\n", 
+                                            slideName, "\nFOV", fov))
+
+# Display the plot
+print(p)
+
+ggsave(filename = "default_transcript_plot.pdf", plot = p, dpi = 600)
+```
+```{r}
+#THIS GENERATES SCATTER PLOTS OF TRANSCRIPTS IDENTIFIED BELOW BY DESEQ, TRYING FOR JUST ONE FOV
+slide <- 1
+fov <- 15
+
+slideName <- unique(cellCoords$Run_Tissue_name[cellCoords$slide_ID_numeric == slide])
+
+fovCoords <- cellCoords[cellCoords$slide_ID_numeric == slide & cellCoords$fov == fov,]
+fovTranscriptCoords <- transcriptCoords[transcriptCoords$slideID == slide & transcriptCoords$fov == fov,]
+
+# specify targets
+targets <- c("MMP1", "MMP2", "MMP9","TIMP1","CCL18","THBS1")
+
+# Subset the transcript coordinates to only include the specified targets
+fovTranscriptCoords <- fovTranscriptCoords[fovTranscriptCoords$target %in% targets,]
+
+p1<-ggplot(fovCoords, aes(x=x_FOV_px, y=y_FOV_px)) +
+  geom_point(alpha = 0.1, size = 0.3, color = "black") +  # cell coordinates as black points of size 0.6 and 50% transparent
+  geom_point(data = fovTranscriptCoords, 
+             mapping = aes(x=x_FOV_px, 
+                           y=y_FOV_px, 
+                           color = target), 
+             size = 0.1, alpha = 0.8) +
+  theme_bw() +
+  theme_bw(base_size = 8)+
+  coord_equal() +
+  guides(colour = guide_legend(override.aes = list(size=1, alpha=1))) +
+  labs(color = "RNA Target", title = paste0("RNA Transcripts in\n", 
+                                            slideName, "\nFOV", fov))
+
+# Display the plot
+print(p1)
+
+# You can now save your plot with ggsave like so:
+ggsave(filename = "your_plot.pdf", plot = p1, dpi = 600, width = 3, height = 3, units = "in")
+```
+```{r}
+#THIS GENERATES SCATTER PLOTS OF TRANSCRIPTS IDENTIFIED BELOW BY DESEQ FOR EXAMPLE FOV FROM EACH "CONDITION", HERE FOCUSING ON A FEW GENES FROM THE VDZ NON-RESPONSE SIGNATURE
+slide <- 1
+fovs <- c("5", "53","16","10","59")  # list of fovs HC-5, PRE-R-53, PRE-NR-16, POST-R10, POST-NR-59
+
+slideName <- unique(cellCoords$Run_Tissue_name[cellCoords$slide_ID_numeric == slide])
+
+# specify targets
+targets <- c("MMP1", "MMP2", "MMP9","TIMP1","CCL18","THBS1")
+
+for(fov in fovs){
+  fov <- as.numeric(fov)  # convert to numeric if your fov is a number
+
+  fovCoords <- cellCoords[cellCoords$slide_ID_numeric == slide & cellCoords$fov == fov,]
+  fovTranscriptCoords <- transcriptCoords[transcriptCoords$slideID == slide & transcriptCoords$fov == fov,]
+
+  # Subset the transcript coordinates to only include the specified targets
+  fovTranscriptCoords <- fovTranscriptCoords[fovTranscriptCoords$target %in% targets,]
+
+  p1<-ggplot(fovCoords, aes(x=x_FOV_px, y=y_FOV_px)) +
+    geom_point(alpha = 0.1, size = 0.3, color = "black") +  # cell coordinates as black points of size 0.6 and 50% transparent
+    geom_point(data = fovTranscriptCoords, 
+               mapping = aes(x=x_FOV_px, 
+                             y=y_FOV_px, 
+                             color = target), 
+               size = 0.3, alpha = 0.75) +
+    theme_bw() +
+    theme_bw(base_size = 8) +
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + #remove gridlines
+    coord_equal() +
+    guides(colour = guide_legend(override.aes = list(size=1, alpha=1))) +
+    labs(color = "RNA Target", title = paste0("RNA Transcripts in\n", 
+                                              slideName, "\nFOV", fov))
+
+  # Display the plot
+  print(p1)
+
+  # You can now save your plot with ggsave like so:
+  ggsave(filename = paste0("fov_", fov, ".pdf"), plot = p1, dpi = 600, width = 3, height = 3, units = "in")
+}
+```
+```{r}
+#THIS GENERATES SCATTER PLOTS OF TRANSCRIPTS IDENTIFIED BELOW BY DESEQ FOR EXAMPLE FOV FROM EACH "CONDITION", HERE FOCUSING ON A FEW GENES FROM THE VDZ RESPONSE SIGNATURE
+slide <- 1
+fovs <- c("5", "53","16","10","59")  # list of fovs HC-5, PRE-R-53, PRE-NR-16, POST-R10, POST-NR-59
+
+slideName <- unique(cellCoords$Run_Tissue_name[cellCoords$slide_ID_numeric == slide])
+
+# specify targets
+targets <- c("DMBT1", "SPINK1", "AGR2","OLFM4","REG1A")
+
+for(fov in fovs){
+  fov <- as.numeric(fov)  # convert to numeric if your fov is a number
+
+  fovCoords <- cellCoords[cellCoords$slide_ID_numeric == slide & cellCoords$fov == fov,]
+  fovTranscriptCoords <- transcriptCoords[transcriptCoords$slideID == slide & transcriptCoords$fov == fov,]
+
+  # Subset the transcript coordinates to only include the specified targets
+  fovTranscriptCoords <- fovTranscriptCoords[fovTranscriptCoords$target %in% targets,]
+
+  p1<-ggplot(fovCoords, aes(x=x_FOV_px, y=y_FOV_px)) +
+    geom_point(alpha = 0.1, size = 0.3, color = "black") +  # cell coordinates as black points of size 0.6 and 50% transparent
+    geom_point(data = fovTranscriptCoords, 
+               mapping = aes(x=x_FOV_px, 
+                             y=y_FOV_px, 
+                             color = target), 
+               size = 0.3, alpha = 0.75) +
+    theme_bw() +
+    theme_bw(base_size = 8) +
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + #remove gridlines
+    coord_equal() +
+    guides(colour = guide_legend(override.aes = list(size=1, alpha=1))) +
+    labs(color = "RNA Target", title = paste0("RNA Transcripts in\n", 
+                                              slideName, "\nFOV", fov))
+
+  # Display the plot
+  print(p1)
+
+  # You can now save your plot with ggsave like so:
+  ggsave(filename = paste0("fov_", fov, "response.pdf"), plot = p1, dpi = 600, width = 3, height = 3, units = "in")
+}
+```
+
+
+
+```{r}
+#HERE GENERATING A SEURAT OBJECT FROM TILEDB DATA STRUCTURE FOR FURTHER ANALYSIS
+RNA_seurat <- tiledb_scdataset$to_seurat(somas = c("RNA"), batch_mode = TRUE)
+RNA_seurat
+```
+
+
+
+**Genes per cell**
+```{r quantiles_1, warning=FALSE,error=FALSE,message=FALSE}
+kable(do.call("cbind", tapply(RNA_seurat$nFeature_RNA, 
+                      Idents(RNA_seurat),quantile,probs=seq(0,1,0.05))),
+      caption = "5% Quantiles of Genes/Cell by Sample") %>% kable_styling()
+
+```
+
+
+## Visualize distribution of metadata values
+
+### Violin plots
+Trying to make violine plots of QC parameters
+
+```{r violins, fig.height=12}
+VlnPlot(RNA_seurat,
+        features = c('nCount_RNA','nFeature_RNA','nCount_falsecode', 'nFeature_negprobes'),
+        ncol = 4,
+        pt.size = 0.3)
+```
+
+#Filtering out cells with <50 counts, <10 genes, or cells/fovs that failed Nanostring QC
+```{r, cell_filtering}
+table(RNA_seurat$orig.ident)
+# UMI filter
+RNA_seurat_filter <- subset(RNA_seurat, nCount_RNA > 50)
+# gene filter
+RNA_seurat_filter <- subset(RNA_seurat_filter, nFeature_RNA > 10)
+# qc filter
+RNA_seurat_filter <- subset(RNA_seurat_filter, qcFlagsCellComplex == 'Pass')
+RNA_seurat_filter <- subset(RNA_seurat_filter, qcFlagsCellCounts == 'Pass')
+RNA_seurat_filter <- subset(RNA_seurat_filter, qcFlagsFOV == 'Pass')
+# filtering results
+RNA_seurat_filter
+table(RNA_seurat_filter$orig.ident)
+
+# use filtered results from now on
+RNA_seurat <- RNA_seurat_filter
+rm(RNA_seurat_filter)
+RNA_seurat
+```
+
+## Feature filtering
+
+Filtering out genes that expressed in fewer than 10 cells
+
+```{r gene_filter}
+# define function
+FilterGenes <- function(object, assay, min.nCount = NA, min.cells = NA, genes = NULL) {
+  genes.use = NA
+  if (!is.null(genes)) {
+    genes.use = intersect(rownames(object), genes)
+    } else if (min.cells & min.nCount) {
+      num.cells = Matrix::rowSums(GetAssayData(object) >= min.nCount)
+      genes.use = names(num.cells[which(num.cells >= min.cells)])
+    }
+  object = object[genes.use,]
+  object = LogSeuratCommand(object = object)
+  return(object)
+}
+# apply filter
+RNA_seurat_filter <- FilterGenes(object = RNA_seurat, assay="RNA", min.nCount=1, min.cells = 10)
+# filtering results
+RNA_seurat_filter
+RNA_seurat <- RNA_seurat_filter
+rm(RNA_seurat_filter)
+```
+##Now we will add annotations that were done using a cominbation of scanpy and excellxgene
+
+```{r}
+# Add metadata
+sc_cell_info <- read.csv("Fine_annotation_3.csv", header = T)
+colnames(sc_cell_info)[1] <- "cell_ID"
+head(sc_cell_info)
+# add Sample metadata to the seurat_obj[[]] slot, ONE by ONE!
+RNA_seurat[['Fine_annotation_3']] <- sc_cell_info$Fine_annotation_3[match(rownames(RNA_seurat@meta.data), sc_cell_info$cell_ID)]
+
+sc_cell_info <- read.csv("HS.csv", header = T)
+colnames(sc_cell_info)[1] <- "cell_ID"
+head(sc_cell_info)
+# add Sample metadata to the seurat_obj[[]] slot, ONE by ONE!
+RNA_seurat[['HS']] <- sc_cell_info$HS[match(rownames(RNA_seurat@meta.data), sc_cell_info$cell_ID)]
+                    
+sc_cell_info <- read.csv("Condition_1.csv", header = T)
+colnames(sc_cell_info)[1] <- "cell_ID"
+head(sc_cell_info)
+# add Sample metadata to the seurat_obj[[]] slot, ONE by ONE!
+RNA_seurat[['Condition']] <- sc_cell_info$Condition[match(rownames(RNA_seurat@meta.data), sc_cell_info$cell_ID)]
+
+sc_cell_info <- read.csv("Endoscopic_severity.csv", header = T)
+colnames(sc_cell_info)[1] <- "cell_ID"
+head(sc_cell_info)
+# add Sample metadata to the seurat_obj[[]] slot, ONE by ONE!
+RNA_seurat[['Endoscopic_severity']] <- sc_cell_info$Endoscopic_severity[match(rownames(RNA_seurat@meta.data), sc_cell_info$cell_ID)]
+```
+
+```{r}
+#here save an interim seurat object
+saveRDS(RNA_seurat, file="23_6_27_CosMx_interim.rds")
+```
+```{r}
+#Here is an exmaple of how to read it into an anndata object as an h5ad file with sceasy, but will read into squidpy using .csv files generated in later steps
+test_obj <- readRDS("23_6_27_CosMx_interim.rds")
+sceasy::convertFormat(test_obj, from="seurat", to="anndata",
+                       outFile='23_7_26_CosMx_interim.h5ad')
+```
+
+
+#Now let's make some modifications to facilitate future reading into squidpy. Convert the xy coordinates for FOV and slide position to the appropriate column names and format. Also export the expression matrix. Sort the cells by FOV and cell_ID, renumber starting with 1->N. For the FOV file, each FOV position is global-local x and y per cell. 
+
+```{r}
+# Copy the column and perform the conversion. 1 pixel=0.120280945um per Nanostring, but using 0.120um per pixel yields an fov origin that is identical for all points in each fov, so use 0.120 as the conversion. Also the y is inverted so mulitply by -1
+RNA_seurat$CenterX_global_px <- (RNA_seurat$x_slide_mm * 1000) / 0.12
+RNA_seurat$CenterY_global_px <- (RNA_seurat$y_slide_mm * -1000) / 0.12
+RNA_seurat$CenterX_local_px <- (RNA_seurat$x_FOV_px)
+RNA_seurat$CenterY_local_px <- (RNA_seurat$y_FOV_px)
+```
+```{r}
+# Extract the metadata from the Seurat object
+metadata <- RNA_seurat@meta.data
+# Sort the metadata dataframe by 'cell_ID' columns
+metadata <- metadata[order(metadata$cell_ID), ]
+# Add a new column for counting from 1 to N because squidpy needs an integer value for cell_ID to read
+metadata$index <- seq_len(nrow(metadata))
+# Delete the "cell_ID" column
+metadata <- subset(metadata, select = -cell_ID)
+# Rename the "index" column to "cell_ID"
+colnames(metadata)[colnames(metadata) == "index"] <- "cell_ID"
+# Rearrange the columns
+if ("fov" %in% colnames(metadata)) {
+  metadata <- metadata[, c("fov", "cell_ID", setdiff(colnames(metadata), c("fov", "cell_ID")))]}
+#Remove row names
+rownames(metadata) <- NULL
+# Export the metadata as a CSV file
+write.csv(metadata, file = "metadata.csv", row.names = FALSE)
+```
+```{r}
+# Extract the transposed expression matrix from the RNA_seurat object and save as a .csv file
+transposed_matrix <- t(RNA_seurat@assays$RNA@counts)
+# Convert the matrix to a data frame
+transposed_matrix <- as.data.frame(transposed_matrix)
+# Add the row names as a new column
+transposed_matrix$cell_ID <- row.names(transposed_matrix)
+# Sort the expression matrix by 'cell_ID' column
+transposed_matrix <- transposed_matrix[order(transposed_matrix$cell_ID), ]
+# Add a new column for counting from 1 to N because squidpy needs an integer value for cell_ID to read
+transposed_matrix$index <- seq_len(nrow(transposed_matrix))
+# Delete the "cell_ID" column
+transposed_matrix <- subset(transposed_matrix, select = -cell_ID)
+# Rename the "index" column to "cell_ID"
+colnames(transposed_matrix)[colnames(transposed_matrix) == "index"] <- "cell_ID"
+# Move the 'cell_ID' column to the first position
+transposed_matrix <- transposed_matrix %>% 
+  select(cell_ID, everything())
+# Remove the original 'index' column
+transposed_matrix <- transposed_matrix[, -ncol(transposed_matrix)]
+# Merge the metadata with transposed_matrix based on 'cell_ID' index
+merged_matrix <- merge(transposed_matrix, metadata[, c("cell_ID", "fov")], by = "cell_ID", all.x = TRUE)
+# Reorder the columns as per desired order
+merged_matrix <- merged_matrix[, c("fov", "cell_ID", colnames(merged_matrix))]
+# Drop the 'cell_ID.1' and 'fov.1' columns from the metadata
+merged_matrix <- merged_matrix[, !(names(merged_matrix) %in% c("cell_ID.1","fov.1"))]
+# Export the transposed expression matrix as a CSV file
+write.csv(merged_matrix, file = "transposed_exprMat_file.csv", row.names = FALSE)
+```
+```{r}
+# Subtract CenterX_local_px from CenterX_global_px to calculate x_global_px for the fov file
+RNA_seurat$x_global_px <- RNA_seurat$CenterX_global_px - RNA_seurat$CenterX_local_px
+
+# Subtract CenterY_local_px from CenterY_global_px to calculate y_global_px for the fov file
+RNA_seurat$y_global_px <- RNA_seurat$CenterY_global_px - RNA_seurat$CenterY_local_px
+
+# Create a new data frame with unique values for fov, x_global_px, and y_global_px
+fov_positions <- unique(RNA_seurat@meta.data[, c("fov", "x_global_px", "y_global_px")])
+# Identify duplicated fov values
+duplicated_fov <- duplicated(fov_positions$fov)
+# Create a new data frame without duplicated fov values
+unique_fov_positions <- fov_positions[!duplicated_fov, ]
+#write file
+write.csv(unique_fov_positions, file = "fov_positions_file.csv", row.names = FALSE)
+
+```
+## Now you have 3 files to read into scanpy "fov_positions_file.csv", "transposed_exprMat_file.csv", "metadata.csv"
+
+#NOW GO TO JUPYTER NOTEBOOK for squidpy analysis. Continue below for pseudobulk analysis
+
+```{r}
+RNA_seurat
+```
+#INDIVIDUAL SUBSETS
+```{r}
+#Now we will perform pseudobulk analysis with deseq2, the first part is an example of how to analysis an individual cell subset MNP_NOS as an example, and later the pseudobulk analysis across all cells
+cts<-AggregateExpression(RNA_seurat,
+                    group.by=c("Fine_annotation_3","HS"),
+                    assays = 'RNA',
+                    slot = 'counts',
+                    return.seurat = FALSE)
+                    
+```
+```{r}
+cts <-cts$RNA
+#transpose
+cts.t<-t(cts)
+#convert to data.frame
+cts.t<- as.data.frame(cts.t)
+#get values where you want to split
+cts.t[1:10,1:10]
+splitRows <- gsub('_FOV.*', '', rownames(cts.t))
+#split data.trame
+cts.split<-split.data.frame(cts.t,
+                 f=factor(splitRows))
+cts.split$`01-IEC_crypt_base`[1:10,1:10]
+#fix colnames and transpose
+cts.split.modified<-lapply(cts.split, function(x){
+  rownames(x)<-gsub('.*(FOV.*)', '\\1',rownames(x))
+                t(x)
+})
+#gsub('.*(FOV.*)', '\\1','01-IEC_crypt_base_FOV01_HS34_VDZ_LC_POST_2_Mayo0_Responder')
+cts.split.modified$`01-IEC_crypt_base`[1:10,1:10]
+#DE analysis in 05-MNP_NOS
+counts_MNP<-cts.split.modified$`05-MNP_NOS`
+colData <- data.frame(samples=colnames(counts_MNP))
+colData <- colData %>%
+  mutate(condition = case_when(
+    grepl('PRE', samples) & grepl('Responder', samples) ~ 'PRE_Responder',
+    grepl('POST', samples) & grepl('Responder', samples) ~ 'POST_Responder',
+    grepl('PRE', samples) & grepl('Non-responder', samples) ~ 'PRE_Non-responder',
+    grepl('POST', samples) & grepl('Non-responder', samples) ~ 'POST_Non-responder',
+    grepl('HC', samples) ~ 'HC'
+  ))
+colData <- column_to_rownames(colData, var='samples')
+```
+```{r}
+#perform DESeq2
+# Set the reference level
+colData$condition <- relevel(factor(colData$condition), ref = "PRE_Responder")
+
+#CreateDESeq2 object
+dds<-DESeqDataSetFromMatrix(countData=counts_MNP,
+                       colData=colData,
+                       design = ~ condition)
+#filter
+keep<-rowSums(counts(dds)) >=1
+dds <-dds[keep,]
+```
+```{r}
+#Run DESeq()
+dds<- DESeq(dds)
+#Check the cofficiencts for the comparison
+resultsNames(dds)
+#Generate results object
+res <- results(dds, contrast=c("condition", "PRE_Non-responder", "PRE_Responder"))
+#write to csv file
+write.csv(res, file = "res.csv")
+head(res)
+```
+
+#ALL CELLS
+```{r}
+# Aggregate expression by "HS" only
+cts_all <- AggregateExpression(
+    RNA_seurat,
+    group.by = "HS",  # removed Fine_annotation_3
+    assays = 'RNA',
+    slot = 'counts',
+    return.seurat = FALSE
+)
+
+# Extract the count matrix
+cts_all <- cts_all$RNA
+#
+colData_all <- data.frame(samples=colnames(cts_all))
+colData_all <- colData_all %>%
+  mutate(condition = case_when(
+    grepl('PRE', samples) & grepl('Responder', samples) ~ 'PRE_Responder',
+    grepl('POST', samples) & grepl('Responder', samples) ~ 'POST_Responder',
+    grepl('PRE', samples) & grepl('Non-responder', samples) ~ 'PRE_Non-responder',
+    grepl('POST', samples) & grepl('Non-responder', samples) ~ 'POST_Non-responder',
+    grepl('HC', samples) ~ 'HC'
+  ))
+rownames(colData_all) <- NULL
+colData_all <- column_to_rownames(colData_all, var='samples')
+```
+```{r}
+#perform DESeq2
+# Set the reference level
+colData_all$condition <- relevel(factor(colData_all$condition), ref = "PRE_Responder")
+#CreateDESeq2 object
+dds_all<-DESeqDataSetFromMatrix(countData=cts_all,
+                       colData=colData_all,
+                       design = ~ condition)
+#filter
+keep<-rowSums(counts(dds_all)) >=1
+dds_all <-dds_all[keep,]
+```
+```{r}
+#Run DESeq()
+dds_all<- DESeq(dds_all)
+#Check the cofficiencts for the comparison
+resultsNames(dds_all)
+#Generate results object
+res_all <- results(dds_all, contrast=c("condition", "PRE_Non-responder", "PRE_Responder"))
+#write to csv file
+write.csv(res_all, file = "res_all.csv")
+```
+
+```{r}
+head(res_all)
+```
+
+
+
