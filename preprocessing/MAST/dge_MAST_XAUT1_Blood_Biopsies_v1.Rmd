@@ -1,0 +1,204 @@
+---
+title: "dge_MAST_XAUT1_Blood"
+author: "Yang-Joon Kim"
+date: "6/15/2022"
+output: html_document
+---
+```{r pressure, echo=FALSE}
+source('~/UlcerativeColitisAtlas/dge_mast_functions.R')
+# XAUT1-Blood, 'condition", "coarse"
+
+# define the dataset names, input and output directories,  at the very top
+# 1) define the input and output directories
+output_dir = '/mnt/ibm_lg/yangjoon.kim/UC_UCSF_Multiome/MAST/subset_condition_XAUT1_Blood/test/' # write DGE .csvs here 
+input_dir_prefix= '/mnt/ibm_lg/yangjoon.kim/UC_UCSF_Multiome/MAST/subset_condition_XAUT1_Blood/'
+# 2) dataset names (individual h5ad files)
+datasets = c('XAUT1_Blood_HC_UCV', 'XAUT1_Blood_UCNB_HC', 'XAUT1_Blood_UCNB_UCV')
+# 3) conditions, baseline_conds, contrast_conds
+condition = 'condition'
+list_baseline_conds = c('HC','HC','UCNB')
+list_contrast_conds = c('UCV','UCNB','UCV')
+# 4) annotation_granularity (name of the cell-type annotation group. i.e. coarse or fine)
+annotation = "coarse"
+
+dgeAllDatasets(input_dir_prefix = input_dir_prefix, output_dir = output_dir,
+               datasets = datasets, condition = condition, 
+               list_baseline_conds = list_baseline_conds,
+               list_contrast_conds = list_contrast_conds,
+               out_id = 'coarse',ann_col = 'coarse',regr_ngenes = T)
+
+
+
+dgeDataset(input_dir_prefix = input_dir_prefix,
+            output_dir = output_dir,
+            dataset =dataset,
+            ann_col = ann_col,
+            data_id = out_id,
+            regress_ngenes = regr_ngenes,
+            condition = condition,
+            baseline_cond = baseline_cond,
+            contrast_cond = contrast_cond)
+
+# merge the results into one dataframe
+merge_organs(tissues=datasets, file_id ='DGE_allcelltypes_coarse.csv', file_name='XAUT1_Blood_condition_',
+             output_file_id = 'coarse', covariate = 'ngenes', write_out=TRUE, input_dir = input_dir_prefix)
+```
+
+```{r pressure, echo=FALSE}
+# XAUT1-Blood, 'condition", "fine"
+
+# define the dataset names, input and output directories,  at the very top
+# 1) define the input and output directories
+output_dir = '/mnt/ibm_lg/yangjoon.kim/UC_UCSF_Multiome/MAST/subset_condition_XAUT1_Blood/' # write DGE .csvs here 
+input_dir_prefix= '/mnt/ibm_lg/yangjoon.kim/UC_UCSF_Multiome/MAST/subset_condition_XAUT1_Blood/'
+# 2) dataset names (individual h5ad files)
+datasets = c('XAUT1_Blood_HC_UCV', 'XAUT1_Blood_UCNB_HC', 'XAUT1_Blood_UCNB_UCV')
+# 3) conditions, baseline_conds, contrast_conds
+condition = 'condition'
+list_baseline_conds = c('HC','HC','UCNB')
+list_contrast_conds = c('UCV','UCNB','UCV')
+# 4) annotation_granularity (name of the cell-type annotation group. i.e. coarse or fine)
+annotation = "fine"
+
+dgeAllDatasets(input_dir_prefix = input_dir_prefix, output_dir = output_dir,
+               datasets = datasets, condition = condition, 
+               list_baseline_conds = list_baseline_conds,
+               list_contrast_conds = list_contrast_conds,
+               out_id = 'fine',ann_col = 'fine',regr_ngenes = T)
+
+
+
+#dgeDataset(input_dir_prefix = input_dir_prefix,
+#             output_dir = output_dir,
+#             dataset =dataset, 
+#             ann_col = ann_col, 
+#             data_id = out_id, 
+#             regress_ngenes = regr_ngenes,
+#             condition = condition,
+#             baseline_cond = baseline_cond,
+#             contrast_cond = contrast_cond)
+
+# merge the results into one dataframe
+merge_organs(tissues=datasets, file_id ='DGE_allcelltypes_fine.csv', file_name='XAUT1_Blood_condition_',
+             output_file_id = 'fine', covariate = 'ngenes', write_out=TRUE, input_dir = input_dir_prefix)
+```
+
+
+```{r pressure, echo=FALSE}
+# XAUT1-Biopsies, 'condition", "coarse"
+
+# define the dataset names, input and output directories,  at the very top
+# 1) define the input and output directories
+output_dir = '/mnt/ibm_lg/yangjoon.kim/UC_UCSF_Multiome/MAST/subset_condition_XAUT1_Biopsies/' # write DGE .csvs here 
+input_dir_prefix= '/mnt/ibm_lg/yangjoon.kim/UC_UCSF_Multiome/MAST/subset_condition_XAUT1_Biopsies/'
+# 2) dataset names (individual h5ad files)
+datasets = c('XAUT1_Biopsies_HC_UCV', 'XAUT1_Biopsies_UCNB_HC', 'XAUT1_Biopsies_UCNB_UCV')
+# 3) conditions, baseline_conds, contrast_conds
+condition = 'condition'
+list_baseline_conds = c('HC','HC','UCNB')
+list_contrast_conds = c('UCV','UCNB','UCV')
+# 4) annotation_granularity (name of the cell-type annotation group. i.e. coarse or fine)
+annotation = "coarse"
+
+dgeAllDatasets(input_dir_prefix = input_dir_prefix, output_dir = output_dir,
+               datasets = datasets, condition = condition, 
+               list_baseline_conds = list_baseline_conds,
+               list_contrast_conds = list_contrast_conds,
+               out_id = 'coarse',ann_col = 'coarse',regr_ngenes = T)
+
+
+
+#dgeDataset(input_dir_prefix = input_dir_prefix,
+#             output_dir = output_dir,
+#             dataset =dataset, 
+#             ann_col = ann_col, 
+#             data_id = out_id, 
+#             regress_ngenes = regr_ngenes,
+#             condition = condition,
+#             baseline_cond = baseline_cond,
+#             contrast_cond = contrast_cond)
+
+# merge the results into one dataframe
+merge_organs(tissues=datasets, file_id ='DGE_allcelltypes_coarse.csv', file_name='XAUT1_Biopsies_condition_',
+             output_file_id = 'coarse', covariate = 'ngenes', write_out=TRUE, input_dir = input_dir_prefix)
+```
+
+```{r pressure, echo=FALSE}
+# XAUT1-Blood, 'condition", "whole_cells" -> pseudo-bulk
+
+# define the dataset names, input and output directories,  at the very top
+# 1) define the input and output directories
+output_dir = '/mnt/ibm_lg/yangjoon.kim/UC_UCSF_Multiome/MAST/subset_condition_XAUT1_Blood/test/' # write DGE .csvs here 
+input_dir_prefix= '/mnt/ibm_lg/yangjoon.kim/UC_UCSF_Multiome/MAST/subset_condition_XAUT1_Blood/'
+# 2) dataset names (individual h5ad files)
+datasets = c('XAUT1_Blood_HC_UCV', 'XAUT1_Blood_HC_UCNB', 'XAUT1_Blood_UCV_UCNB')
+# 3) conditions, baseline_conds, contrast_conds
+condition = 'condition'
+list_baseline_conds = c('HC','HC','UCNB')
+list_contrast_conds = c('UCV','UCNB','UCV')
+# 4) annotation_granularity (name of the cell-type annotation group. i.e. coarse or fine)
+annotation = "whole_cells"
+
+dgeAllDatasets(input_dir_prefix = input_dir_prefix, output_dir = output_dir,
+               datasets = datasets, condition = condition, 
+               list_baseline_conds = list_baseline_conds,
+               list_contrast_conds = list_contrast_conds,
+               out_id = 'whole_cells',ann_col = 'whole_cells',regr_ngenes = T)
+
+
+
+#dgeDataset(input_dir_prefix = input_dir_prefix,
+#             output_dir = output_dir,
+#             dataset =dataset, 
+#             ann_col = ann_col, 
+#             data_id = out_id, 
+#             regress_ngenes = regr_ngenes,
+#             condition = condition,
+#             baseline_cond = baseline_cond,
+#             contrast_cond = contrast_cond)
+
+# merge the results into one dataframe
+input_dir_prefix = "/mnt/ibm_lg/yangjoon.kim/UC_UCSF_Multiome/MAST/subset_condition_XAUT1_Blood/test/"
+merge_organs(tissues=datasets, file_id ='DGE_allcelltypes_whole_cells.csv', file_name='XAUT1_Blood_condition_',
+             output_file_id = 'whole_cells', covariate = 'ngenes', write_out=TRUE, input_dir = input_dir_prefix)
+```
+
+```{r pressure, echo=FALSE}
+# XAUT1-Biopsies, 'condition", "whole_cells" -> pseudo-bulk
+
+# define the dataset names, input and output directories,  at the very top
+# 1) define the input and output directories
+output_dir = '/mnt/ibm_lg/yangjoon.kim/UC_UCSF_Multiome/MAST/subset_condition_XAUT1_Biopsies/' # write DGE .csvs here 
+input_dir_prefix= '/mnt/ibm_lg/yangjoon.kim/UC_UCSF_Multiome/MAST/subset_condition_XAUT1_Biopsies/'
+# 2) dataset names (individual h5ad files)
+datasets = c('XAUT1_Biopsies_HC_UCV', 'XAUT1_Biopsies_UCNB_HC', 'XAUT1_Biopsies_UCNB_UCV')
+# 3) conditions, baseline_conds, contrast_conds
+condition = 'condition'
+list_baseline_conds = c('HC','HC','UCNB')
+list_contrast_conds = c('UCV','UCNB','UCV')
+# 4) annotation_granularity (name of the cell-type annotation group. i.e. coarse or fine)
+annotation = "whole_cells"
+
+dgeAllDatasets(input_dir_prefix = input_dir_prefix, output_dir = output_dir,
+               datasets = datasets, condition = condition, 
+               list_baseline_conds = list_baseline_conds,
+               list_contrast_conds = list_contrast_conds,
+               out_id = 'whole_cells',ann_col = 'whole_cells',regr_ngenes = T)
+
+
+
+#dgeDataset(input_dir_prefix = input_dir_prefix,
+#             output_dir = output_dir,
+#             dataset =dataset, 
+#             ann_col = ann_col, 
+#             data_id = out_id, 
+#             regress_ngenes = regr_ngenes,
+#             condition = condition,
+#             baseline_cond = baseline_cond,
+#             contrast_cond = contrast_cond)
+
+# merge the results into one dataframe
+input_dir_prefix = "/mnt/ibm_lg/yangjoon.kim/UC_UCSF_Multiome/MAST/subset_condition_XAUT1_Biopsies/"
+merge_organs(tissues=datasets, file_id ='DGE_allcelltypes_whole_cells.csv', file_name='XAUT1_Biopsies_condition_',
+             output_file_id = 'whole_cells', covariate = 'ngenes', write_out=TRUE, input_dir = input_dir_prefix)
+```
