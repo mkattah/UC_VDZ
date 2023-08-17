@@ -174,7 +174,7 @@ fovCoords <- cellCoords[cellCoords$slide_ID_numeric == slide & cellCoords$fov ==
 fovTranscriptCoords <- transcriptCoords[transcriptCoords$slideID == slide & transcriptCoords$fov == fov,]
 
 # specify targets
-targets <- c("MMP1", "MMP2", "MMP9","TIMP1","CCL18","THBS1")
+targets <- c("MMP1", "MMP2", "THBS1")
 
 # Subset the transcript coordinates to only include the specified targets
 fovTranscriptCoords <- fovTranscriptCoords[fovTranscriptCoords$target %in% targets,]
@@ -207,7 +207,7 @@ fovs <- c("5", "53","16","10","59")  # list of fovs HC-5, PRE-R-53, PRE-NR-16, P
 slideName <- unique(cellCoords$Run_Tissue_name[cellCoords$slide_ID_numeric == slide])
 
 # specify targets
-targets <- c("MMP1", "MMP2", "MMP9","TIMP1","CCL18","THBS1")
+targets <- c("MMP1", "MMP2", "THBS1")
 
 for(fov in fovs){
   fov <- as.numeric(fov)  # convert to numeric if your fov is a number
@@ -248,7 +248,7 @@ fovs <- c("5", "53","16","10","59")  # list of fovs HC-5, PRE-R-53, PRE-NR-16, P
 slideName <- unique(cellCoords$Run_Tissue_name[cellCoords$slide_ID_numeric == slide])
 
 # specify targets
-targets <- c("DMBT1", "SPINK1", "AGR2","OLFM4","REG1A")
+targets <- c("AGR2","OLFM4","REG1A")
 
 for(fov in fovs){
   fov <- as.numeric(fov)  # convert to numeric if your fov is a number
@@ -374,7 +374,19 @@ colnames(sc_cell_info)[1] <- "cell_ID"
 head(sc_cell_info)
 # add Sample metadata to the seurat_obj[[]] slot, ONE by ONE!
 RNA_seurat[['HS']] <- sc_cell_info$HS[match(rownames(RNA_seurat@meta.data), sc_cell_info$cell_ID)]
-                    
+              
+sc_cell_info <- read.csv("HS_combinefov.csv", header = T)
+colnames(sc_cell_info)[1] <- "cell_ID"
+head(sc_cell_info)
+# add Sample metadata to the seurat_obj[[]] slot, ONE by ONE!
+RNA_seurat[['HS_combinefov']] <- sc_cell_info$HS_combinefov[match(rownames(RNA_seurat@meta.data), sc_cell_info$cell_ID)]
+
+sc_cell_info <- read.csv("HS_combinebiopsy.csv", header = T)
+colnames(sc_cell_info)[1] <- "cell_ID"
+head(sc_cell_info)
+# add Sample metadata to the seurat_obj[[]] slot, ONE by ONE!
+RNA_seurat[['HS_combinebiopsy']] <- sc_cell_info$HS_combinebiopsy[match(rownames(RNA_seurat@meta.data), sc_cell_info$cell_ID)]
+      
 sc_cell_info <- read.csv("Condition_1.csv", header = T)
 colnames(sc_cell_info)[1] <- "cell_ID"
 head(sc_cell_info)
@@ -386,6 +398,7 @@ colnames(sc_cell_info)[1] <- "cell_ID"
 head(sc_cell_info)
 # add Sample metadata to the seurat_obj[[]] slot, ONE by ONE!
 RNA_seurat[['Endoscopic_severity']] <- sc_cell_info$Endoscopic_severity[match(rownames(RNA_seurat@meta.data), sc_cell_info$cell_ID)]
+
 ```
 
 ```{r}
@@ -485,7 +498,7 @@ RNA_seurat
 ```{r}
 #Now we will perform pseudobulk analysis with deseq2, the first part is an example of how to analysis an individual cell subset MNP_NOS as an example, and later the pseudobulk analysis across all cells
 cts<-AggregateExpression(RNA_seurat,
-                    group.by=c("Fine_annotation_3","HS"),
+                    group.by=c("Fine_annotation_4_MNP_fibro_coarse","HS_combinebiopsy"),
                     assays = 'RNA',
                     slot = 'counts',
                     return.seurat = FALSE)
@@ -503,16 +516,16 @@ splitRows <- gsub('_FOV.*', '', rownames(cts.t))
 #split data.trame
 cts.split<-split.data.frame(cts.t,
                  f=factor(splitRows))
-cts.split$`01-IEC_crypt_base`[1:10,1:10]
+cts.split$`05_MNP_coarse`[1:10,1:10]
 #fix colnames and transpose
 cts.split.modified<-lapply(cts.split, function(x){
   rownames(x)<-gsub('.*(FOV.*)', '\\1',rownames(x))
                 t(x)
 })
 #gsub('.*(FOV.*)', '\\1','01-IEC_crypt_base_FOV01_HS34_VDZ_LC_POST_2_Mayo0_Responder')
-cts.split.modified$`01-IEC_crypt_base`[1:10,1:10]
-#DE analysis in 05-MNP_NOS
-counts_MNP<-cts.split.modified$`05-MNP_NOS`
+cts.split.modified$`05_MNP_coarse`[1:10,1:10]
+#DE analysis in 05_MNP_coarse
+counts_MNP<-cts.split.modified$`05_MNP_coarse`
 colData <- data.frame(samples=colnames(counts_MNP))
 colData <- colData %>%
   mutate(condition = case_when(
@@ -545,13 +558,13 @@ resultsNames(dds)
 #Generate results object
 res <- results(dds, contrast=c("condition", "PRE_Non-responder", "PRE_Responder"))
 #write to csv file
-write.csv(res, file = "res.csv")
+write.csv(res, file = "res_MNP.csv")
 head(res)
 ```
 
 #ALL CELLS
 ```{r}
-# Aggregate expression by "HS" only
+# Aggregate expression by "HS" only, then by 'HS_combinefov' then by 'HS_combinebiopsy'
 cts_all <- AggregateExpression(
     RNA_seurat,
     group.by = "HS",  # removed Fine_annotation_3
