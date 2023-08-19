@@ -443,9 +443,10 @@ write.csv(metadata, file = "metadata.csv", row.names = FALSE)
 ```
 ```{r}
 # Extract the transposed expression matrix from the RNA_seurat object and save as a .csv file
-transposed_matrix <- t(RNA_seurat@assays$RNA@counts)
-# Convert the matrix to a data frame
-transposed_matrix <- as.data.frame(transposed_matrix)
+# Extract the transposed expression matrix from the RNA_seurat object
+transposed_matrix <- as.data.frame(t(RNA_seurat@assays$RNA@counts))
+# Save gene names for later use
+gene_names <- colnames(transposed_matrix)
 # Add the row names as a new column
 transposed_matrix$cell_ID <- row.names(transposed_matrix)
 # Sort the expression matrix by 'cell_ID' column
@@ -456,15 +457,10 @@ transposed_matrix$index <- seq_len(nrow(transposed_matrix))
 transposed_matrix <- subset(transposed_matrix, select = -cell_ID)
 # Rename the "index" column to "cell_ID"
 colnames(transposed_matrix)[colnames(transposed_matrix) == "index"] <- "cell_ID"
-# Move the 'cell_ID' column to the first position
-transposed_matrix <- transposed_matrix %>% 
-  select(cell_ID, everything())
-# Remove the original 'index' column
-transposed_matrix <- transposed_matrix[, -ncol(transposed_matrix)]
 # Merge the metadata with transposed_matrix based on 'cell_ID' index
 merged_matrix <- merge(transposed_matrix, metadata[, c("cell_ID", "fov")], by = "cell_ID", all.x = TRUE)
-# Reorder the columns as per desired order
-merged_matrix <- merged_matrix[, c("fov", "cell_ID", colnames(merged_matrix))]
+# Reorder the columns using the stored gene names
+merged_matrix <- merged_matrix[, c("fov", "cell_ID", gene_names)]
 # Drop the 'cell_ID.1' and 'fov.1' columns from the metadata
 merged_matrix <- merged_matrix[, !(names(merged_matrix) %in% c("cell_ID.1","fov.1"))]
 # Export the transposed expression matrix as a CSV file
@@ -489,77 +485,11 @@ write.csv(unique_fov_positions, file = "fov_positions_file.csv", row.names = FAL
 ```
 ## Now you have 3 files to read into scanpy "fov_positions_file.csv", "transposed_exprMat_file.csv", "metadata.csv"
 
+
 #NOW GO TO JUPYTER NOTEBOOK for squidpy analysis. Continue below for pseudobulk analysis
 
 ```{r}
 RNA_seurat
-```
-#INDIVIDUAL SUBSETS
-```{r}
-#Now we will perform pseudobulk analysis with deseq2, the first part is an example of how to analysis an individual cell subset MNP_NOS as an example, and later the pseudobulk analysis across all cells
-cts<-AggregateExpression(RNA_seurat,
-                    group.by=c("Fine_annotation_4_MNP_fibro_coarse","HS_combinebiopsy"),
-                    assays = 'RNA',
-                    slot = 'counts',
-                    return.seurat = FALSE)
-                    
-```
-```{r}
-cts <-cts$RNA
-#transpose
-cts.t<-t(cts)
-#convert to data.frame
-cts.t<- as.data.frame(cts.t)
-#get values where you want to split
-cts.t[1:10,1:10]
-splitRows <- gsub('_FOV.*', '', rownames(cts.t))
-#split data.trame
-cts.split<-split.data.frame(cts.t,
-                 f=factor(splitRows))
-cts.split$`05_MNP_coarse`[1:10,1:10]
-#fix colnames and transpose
-cts.split.modified<-lapply(cts.split, function(x){
-  rownames(x)<-gsub('.*(FOV.*)', '\\1',rownames(x))
-                t(x)
-})
-#gsub('.*(FOV.*)', '\\1','01-IEC_crypt_base_FOV01_HS34_VDZ_LC_POST_2_Mayo0_Responder')
-cts.split.modified$`05_MNP_coarse`[1:10,1:10]
-#DE analysis in 05_MNP_coarse
-counts_MNP<-cts.split.modified$`05_MNP_coarse`
-colData <- data.frame(samples=colnames(counts_MNP))
-colData <- colData %>%
-  mutate(condition = case_when(
-    grepl('PRE', samples) & grepl('Responder', samples) ~ 'PRE_Responder',
-    grepl('POST', samples) & grepl('Responder', samples) ~ 'POST_Responder',
-    grepl('PRE', samples) & grepl('Non-responder', samples) ~ 'PRE_Non-responder',
-    grepl('POST', samples) & grepl('Non-responder', samples) ~ 'POST_Non-responder',
-    grepl('HC', samples) ~ 'HC'
-  ))
-colData <- column_to_rownames(colData, var='samples')
-```
-```{r}
-#perform DESeq2
-# Set the reference level
-colData$condition <- relevel(factor(colData$condition), ref = "PRE_Responder")
-
-#CreateDESeq2 object
-dds<-DESeqDataSetFromMatrix(countData=counts_MNP,
-                       colData=colData,
-                       design = ~ condition)
-#filter
-keep<-rowSums(counts(dds)) >=1
-dds <-dds[keep,]
-```
-```{r}
-#Run DESeq()
-dds<- DESeq(dds)
-#Check the cofficiencts for the comparison
-resultsNames(dds)
-#Generate results object
-res <- results(dds, contrast=c("condition", "PRE_Non-responder", "PRE_Responder"))
-#write to csv file
-write.csv(res, file = "res_MNP.csv")
-head(res)
 ```
 
 #ALL CELLS
