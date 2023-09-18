@@ -1,6 +1,6 @@
 ---
 title: "23_8_6TileDB.Rmd"
-author: "Michael Kattah"
+author: "Madison Lotstein and Michael Kattah"
 date: "`r Sys.Date()`"
 output: html_document
 ---
@@ -163,6 +163,9 @@ print(p)
 
 ggsave(filename = "default_transcript_plot.pdf", plot = p, dpi = 600)
 ```
+
+
+
 ```{r}
 #THIS GENERATES SCATTER PLOTS OF TRANSCRIPTS IDENTIFIED BELOW BY DESEQ, TRYING FOR JUST ONE FOV
 slide <- 1
@@ -180,7 +183,7 @@ targets <- c("MMP1", "MMP2", "THBS1")
 fovTranscriptCoords <- fovTranscriptCoords[fovTranscriptCoords$target %in% targets,]
 
 p1<-ggplot(fovCoords, aes(x=x_FOV_px, y=y_FOV_px)) +
-  geom_point(alpha = 0.1, size = 0.3, color = "black") +  # cell coordinates as black points of size 0.6 and 50% transparent
+  geom_point(alpha = 0.1, size = 0.3, color = "black") +  # cell coordinates as points; specifying point transparency, size, and color
   geom_point(data = fovTranscriptCoords, 
              mapping = aes(x=x_FOV_px, 
                            y=y_FOV_px, 
@@ -199,6 +202,8 @@ print(p1)
 # You can now save your plot with ggsave like so:
 ggsave(filename = "your_plot.pdf", plot = p1, dpi = 600, width = 3, height = 3, units = "in")
 ```
+
+
 ```{r}
 #THIS GENERATES SCATTER PLOTS OF TRANSCRIPTS IDENTIFIED BELOW BY DESEQ FOR EXAMPLE FOV FROM EACH "CONDITION", HERE FOCUSING ON A FEW GENES FROM THE VDZ NON-RESPONSE SIGNATURE
 slide <- 1
@@ -219,7 +224,7 @@ for(fov in fovs){
   fovTranscriptCoords <- fovTranscriptCoords[fovTranscriptCoords$target %in% targets,]
 
   p1<-ggplot(fovCoords, aes(x=x_FOV_px, y=y_FOV_px)) +
-    geom_point(alpha = 0.1, size = 0.3, color = "black") +  # cell coordinates as black points of size 0.6 and 50% transparent
+    geom_point(alpha = 0.1, size = 0.3, color = "black") +  # cell coordinates as points; specifying point transparency, size, and color
     geom_point(data = fovTranscriptCoords, 
                mapping = aes(x=x_FOV_px, 
                              y=y_FOV_px, 
@@ -240,6 +245,9 @@ for(fov in fovs){
   ggsave(filename = paste0("fov_", fov, ".pdf"), plot = p1, dpi = 600, width = 3, height = 3, units = "in")
 }
 ```
+
+
+
 ```{r}
 #THIS GENERATES SCATTER PLOTS OF TRANSCRIPTS IDENTIFIED BELOW BY DESEQ FOR EXAMPLE FOV FROM EACH "CONDITION", HERE FOCUSING ON A FEW GENES FROM THE VDZ RESPONSE SIGNATURE
 slide <- 1
@@ -260,7 +268,7 @@ for(fov in fovs){
   fovTranscriptCoords <- fovTranscriptCoords[fovTranscriptCoords$target %in% targets,]
 
   p1<-ggplot(fovCoords, aes(x=x_FOV_px, y=y_FOV_px)) +
-    geom_point(alpha = 0.1, size = 0.3, color = "black") +  # cell coordinates as black points of size 0.6 and 50% transparent
+    geom_point(alpha = 0.1, size = 0.3, color = "black") +  # cell coordinates as points; specifying point transparency, size, and color
     geom_point(data = fovTranscriptCoords, 
                mapping = aes(x=x_FOV_px, 
                              y=y_FOV_px, 
@@ -268,7 +276,7 @@ for(fov in fovs){
                size = 0.3, alpha = 0.75) +
     theme_bw() +
     theme_bw(base_size = 8) +
-    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + #remove gridlines
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + #remove grid lines
     coord_equal() +
     guides(colour = guide_legend(override.aes = list(size=1, alpha=1))) +
     labs(color = "RNA Target", title = paste0("RNA Transcripts in\n", 
@@ -416,7 +424,7 @@ sceasy::convertFormat(test_obj, from="seurat", to="anndata",
 #Now let's make some modifications to facilitate future reading into squidpy. Convert the xy coordinates for FOV and slide position to the appropriate column names and format. Also export the expression matrix. Sort the cells by FOV and cell_ID, renumber starting with 1->N. For the FOV file, each FOV position is global-local x and y per cell. 
 
 ```{r}
-# Copy the column and perform the conversion. 1 pixel=0.120280945um per Nanostring, but using 0.120um per pixel yields an fov origin that is identical for all points in each fov, so use 0.120 as the conversion. Also the y is inverted so mulitply by -1
+# Copy the column and perform the conversion. 1 pixel=0.120280945um per Nanostring, but using 0.120um per pixel yields an fov origin that is identical for all points in each fov, so use 0.120 as the conversion. Also the y is inverted so multiply by -1
 RNA_seurat$CenterX_global_px <- (RNA_seurat$x_slide_mm * 1000) / 0.12
 RNA_seurat$CenterY_global_px <- (RNA_seurat$y_slide_mm * -1000) / 0.12
 RNA_seurat$CenterX_local_px <- (RNA_seurat$x_FOV_px)
@@ -533,7 +541,7 @@ dds_all <-dds_all[keep,]
 ```{r}
 #Run DESeq()
 dds_all<- DESeq(dds_all)
-#Check the cofficiencts for the comparison
+#Check the coefficients for the comparison
 resultsNames(dds_all)
 #Generate results object
 res_all <- results(dds_all, contrast=c("condition", "PRE_Non-responder", "PRE_Responder"))
