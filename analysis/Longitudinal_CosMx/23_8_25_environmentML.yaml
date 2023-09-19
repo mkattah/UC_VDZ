@@ -1,7 +1,8 @@
 name: myenv
 channels:
-  - conda-forge
   - defaults
+    - defaults
+    - conda-forge
 dependencies:
   - aiosignal=1.2.0=pyhd3eb1b0_0
   - anndata=0.9.2=pyhd8ed1ab_0
