@@ -1,6 +1,5 @@
 name: myenv
 channels:
-  - defaults
     - defaults
     - conda-forge
 dependencies:
